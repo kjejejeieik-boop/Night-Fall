@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>NIGHTFALL - Hell Horde Mode</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background: #0a0a0a;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #gameCanvas { z-index: 1; }
+        #lightCanvas { z-index: 2; pointer-events: none; }
+        .hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            pointer-events: none;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 100%);
+        }
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .stat-card {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            padding: 8px 16px;
+            border-left: 3px solid #c0392b;
+        }
+        .stat-label { font-size: 9px; letter-spacing: 2px; color: #888; text-transform: uppercase; }
+        .stat-value { font-size: 22px; font-weight: bold; color: #e74c3c; }
+        .health-bar-container { width: 200px; }
+        .health-bar-bg { background: #2c1a1a; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 5px; }
+        .health-bar-fill { background: linear-gradient(90deg, #e74c3c, #c0392b); width: 100%; height: 100%; transition: width 0.2s; }
+        .currency .stat-value { color: #f39c12; }
+        .wave .stat-value { color: #27ae60; }
+        .shop-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 15px 20px;
+            z-index: 30;
+            border: 1px solid #c0392b;
+            pointer-events: auto;
+        }
+        .shop-panel.hide { display: none; }
+        .shop-title { color: #f39c12; font-size: 14px; letter-spacing: 3px; margin-bottom: 12px; text-align: center; }
+        .shop-items { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
+        .shop-item {
+            background: rgba(30,30,20,0.8);
+            border-radius: 10px;
+            padding: 10px 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.1s;
+            border: 1px solid #555;
+            min-width: 100px;
+        }
+        .shop-item:active { transform: scale(0.96); background: #3a2a1a; }
+        .shop-item-name { color: #ddd; font-size: 11px; font-weight: bold; }
+        .shop-item-level { color: #f39c12; font-size: 9px; margin: 4px 0; }
+        .shop-item-price { color: #e74c3c; font-size: 12px; font-weight: bold; }
+        .mobile-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 160px;
+            z-index: 25;
+            display: none;
+            pointer-events: none;
+        }
+        .joystick-area {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 120px;
+            height: 120px;
+            background: rgba(30,30,20,0.6);
+            backdrop-filter: blur(8px);
+            border-radius: 50%;
+            border: 2px solid rgba(192,57,43,0.5);
+            pointer-events: all;
+        }
+        .joystick-knob {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            background: radial-gradient(circle, #c0392b, #801010);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        .action-buttons {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 15px;
+            pointer-events: all;
+        }
+        .action-btn {
+            width: 65px;
+            height: 65px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            border: 2px solid #c0392b;
+            color: #ddd;
+            cursor: pointer;
+        }
+        .action-btn:active { transform: scale(0.92); background: #c0392b; }
+        .screen {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            background: radial-gradient(ellipse at center, #0a0a0a, #000000);
+        }
+        .screen.hide { display: none; }
+        .game-title {
+            font-size: clamp(32px, 10vw, 72px);
+            letter-spacing: 15px;
+            color: #c0392b;
+            text-shadow: 0 0 30px #800;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .subtitle { color: #666; letter-spacing: 5px; font-size: 11px; margin-bottom: 40px; }
+        .btn {
+            background: transparent;
+            border: 2px solid #c0392b;
+            color: #c0392b;
+            padding: 12px 35px;
+            font-family: monospace;
+            font-size: 14px;
+            letter-spacing: 4px;
+            cursor: pointer;
+            margin: 8px;
+        }
+        .btn:active { background: #c0392b; color: #000; }
+        .damage-flash {
+            position: absolute;
+            inset: 0;
+            background: rgba(180, 0, 0, 0.4);
+            pointer-events: none;
+            z-index: 8;
+            opacity: 0;
+        }
+        .zombie-counter {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #ff6644;
+            z-index: 10;
+            pointer-events: none;
+            font-weight: bold;
+        }
+        .warning {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: rgba(200,0,0,0.6);
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 10px;
+            color: white;
+            z-index: 10;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%,100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<canvas id="lightCanvas"></canvas>
+<div class="damage-flash" id="damageFlash"></div>
+<div class="zombie-counter" id="zombieCounter">🧟 ZOMBIES: 0</div>
+<div class="warning" id="warningMsg">⚠️ HELL MODE ⚠️</div>
+
+<div class="hud">
+    <div class="hud-top">
+        <div class="stat-card">
+            <div class="stat-label">HEALTH</div>
+            <div class="health-bar-container">
+                <div class="health-bar-bg"><div class="health-bar-fill" id="healthFill" style="width: 100%"></div></div>
+            </div>
+        </div>
+        <div class="stat-card currency">
+            <div class="stat-label">💰 COINS</div>
+            <div class="stat-value" id="coinDisplay">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">🔫 DAMAGE</div>
+            <div class="stat-value" id="damageDisplay">40</div>
+        </div>
+        <div class="stat-card wave">
+            <div class="stat-label">🌊 WAVE</div>
+            <div class="stat-value" id="waveDisplay">1</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">💀 KILLS</div>
+            <div class="stat-value" id="killDisplay">0</div>
+        </div>
+    </div>
+</div>
+
+<div id="shopPanel" class="shop-panel">
+    <div class="shop-title">⚔️ BLACK MARKET ⚔️</div>
+    <div class="shop-items">
+        <div class="shop-item" id="upgradeDamage">
+            <div class="shop-item-name">🔪 DAMAGE</div>
+            <div class="shop-item-level" id="damageLv">Lv.1</div>
+            <div class="shop-item-price" id="damagePrice">💰 100</div>
+        </div>
+        <div class="shop-item" id="upgradeSpeed">
+            <div class="shop-item-name">⚡ SPEED</div>
+            <div class="shop-item-level" id="speedLv">Lv.1</div>
+            <div class="shop-item-price" id="speedPrice">💰 80</div>
+        </div>
+        <div class="shop-item" id="upgradeHealth">
+            <div class="shop-item-name">❤️ HEALTH</div>
+            <div class="shop-item-level" id="healthLv">Lv.1</div>
+            <div class="shop-item-price" id="healthPrice">💰 120</div>
+        </div>
+    </div>
+</div>
+
+<div id="mobileControls" class="mobile-controls">
+    <div id="joystickZone" class="joystick-area"><div id="joystickKnob" class="joystick-knob"></div></div>
+    <div class="action-buttons">
+        <div id="shootBtn" class="action-btn">🔫</div>
+        <div id="shopToggleBtn" class="action-btn">💰</div>
+    </div>
+</div>
+
+<div id="startScreen" class="screen">
+    <div class="game-title">NIGHTFALL</div>
+    <div class="subtitle">— HELL HORDE MODE —</div>
+    <button class="btn" id="startBtn">▶ ENTER HELL</button>
+    <div style="margin-top: 20px; color: #888; font-size: 12px; text-align: center; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px;">
+        🧟 <span style="color:#ff6644; font-weight:bold;">40 ZOMBIES SPAWN IMMEDIATELY!</span> 🧟<br>
+        ⚔️ CLICK/SHOOT TO KILL → GET COINS<br>
+        💰 UPGRADE WEAPONS AT BOTTOM<br>
+        🏃 MOVE WITH WASD or JOYSTICK<br>
+        🔥 <span style="color:#ff4444;">HORDE MODE - CONSTANT SPAWNING!</span> 🔥
+    </div>
+</div>
+
+<div id="gameOverScreen" class="screen hide">
+    <div class="game-title" style="color:#6b0000;">YOU DIED</div>
+    <div class="subtitle">— THE HORDE CONSUMES YOU —</div>
+    <div class="stats-screen" id="gameOverStats" style="margin: 20px 0; color: #888;"></div>
+    <button class="btn" id="restartBtn">💀 RESTART</button>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const lightCanvas = document.getElementById('lightCanvas');
+    const lctx = lightCanvas.getContext('2d');
+
+    const WORLD_W = 4000;
+    const WORLD_H = 4000;
+    let cam = { x: 0, y: 0 };
+    let gameRunning = false;
+    let kills = 0;
+    let coins = 150;
+    let wave = 1;
+    let lastTime = 0;
+    let totalSpawned = 0;
+
+    let player = {
+        x: WORLD_W/2, y: WORLD_H/2, r: 15, hp: 100, maxHp: 100,
+        speed: 200, angle: 0, invincibleTimer: 0
+    };
+
+    let upgrades = {
+        damage: { level: 1, base: 40, increment: 15, cost: 100 },
+        speed: { level: 1, base: 200, increment: 20, cost: 80 },
+        health: { level: 1, base: 100, increment: 25, cost: 120 }
+    };
+    let currentDamage = 40;
+
+    let zombies = [];
+    let bullets = [];
+    let particles = [];
+
+    let shootCooldown = 0;
+    const SHOOT_DELAY = 0.09;
+
+    let keys = {};
+    let mouse = { x: 0, y: 0, down: false };
+    let joystick = { active: false, dx: 0, dy: 0 };
+
+    const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+    // AUDIO SYSTEM
+    let audioCtx = null;
+    function initAudio() {
+        if (!audioCtx && gameRunning) {
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                audioCtx.resume();
+            } catch(e) { console.log("Web Audio not supported"); }
+        }
+    }
+    function playSound(type) {
+        if (!audioCtx) return;
+        try {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.gain.value = 0.12;
+            if (type === 'shoot') {
+                osc.frequency.value = 880;
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'kill') {
+                osc.frequency.value = 440;
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.18);
+            } else if (type === 'hit') {
+                osc.frequency.value = 180;
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+            }
+        } catch(e) {}
+    }
+
+    // ZOMBIE TYPES - MORE VARIETY
+    const ZOMBIE_TYPES = [
+        { name: 'Walker', hp: 40, speed: 58, damage: 10, reward: 15, color: '#6a8a5a', size: 18, eye: '#ff6666' },
+        { name: 'Runner', hp: 25, speed: 155, damage: 7, reward: 20, color: '#8a6a4a', size: 15, eye: '#ffaa66' },
+        { name: 'Brute', hp: 120, speed: 40, damage: 22, reward: 35, color: '#5a7a55', size: 23, eye: '#ff4444' },
+        { name: 'Bloater', hp: 70, speed: 50, damage: 14, reward: 25, color: '#8aaa6a', size: 20, eye: '#aaff66' },
+        { name: 'Shrieker', hp: 32, speed: 90, damage: 9, reward: 18, color: '#aa88aa', size: 16, eye: '#ffaaff' },
+        { name: 'Toxic', hp: 55, speed: 65, damage: 12, reward: 22, color: '#6aaa6a', size: 17, eye: '#88ff88' },
+        { name: 'Shadow', hp: 30, speed: 130, damage: 8, reward: 16, color: '#4a4a6a', size: 14, eye: '#8888ff' }
+    ];
+
+    let obstacles = [];
+
+    function generateWorld() {
+        obstacles = [];
+        for (let i = 0; i < 250; i++) {
+            let x = Math.random() * WORLD_W;
+            let y = Math.random() * WORLD_H;
+            if (Math.hypot(x - WORLD_W/2, y - WORLD_H/2) < 150) continue;
+            if (Math.random() > 0.6) {
+                obstacles.push({ x, y, radius: 12 + Math.random() * 18, isCircle: true });
+            } else {
+                obstacles.push({ x, y, w: 35 + Math.random() * 55, h: 35 + Math.random() * 55, isCircle: false });
+            }
+        }
+    }
+
+    function checkCollision(x, y, radius) {
+        for (let obs of obstacles) {
+            if (obs.isCircle) {
+                let dx = x - obs.x, dy = y - obs.y;
+                if (dx * dx + dy * dy < (radius + obs.radius) ** 2) return true;
+            } else {
+                let left = obs.x - obs.w/2, right = obs.x + obs.w/2;
+                let top = obs.y - obs.h/2, bottom = obs.y + obs.h/2;
+                let closestX = Math.max(left, Math.min(x, right));
+                let closestY = Math.max(top, Math.min(y, bottom));
+                let dx = x - closestX, dy = y - closestY;
+                if (dx * dx + dy * dy < radius * radius) return true;
+            }
+        }
+        return false;
+    }
+
+    function spawnZombie() {
+        if (!gameRunning) return;
+        
+        let type = ZOMBIE_TYPES[Math.floor(Math.random() * ZOMBIE_TYPES.length)];
+        let bonusHp = Math.floor(wave * 2);
+        let bonusSpeed = Math.min(wave * 0.8, 45);
+        
+        let side = Math.floor(Math.random() * 4);
+        let x, y;
+        if (side === 0) { x = Math.random() * WORLD_W; y = -60; }
+        else if (side === 2) { x = Math.random() * WORLD_W; y = WORLD_H + 60; }
+        else if (side === 1) { x = WORLD_W + 60; y = Math.random() * WORLD_H; }
+        else { x = -60; y = Math.random() * WORLD_H; }
+        
+        x = Math.min(WORLD_W - 40, Math.max(40, x));
+        y = Math.min(WORLD_H - 40, Math.max(40, y));
+        
+        zombies.push({
+            x, y,
+            hp: type.hp + bonusHp,
+            maxHp: type.hp + bonusHp,
+            speed: Math.min(type.speed + bonusSpeed, 200),
+            damage: type.damage,
+            reward: type.reward,
+            color: type.color,
+            size: type.size,
+            eye: type.eye,
+            angle: 0,
+            wobble: Math.random() * Math.PI * 2,
+            flashTimer: 0
+        });
+        
+        totalSpawned++;
+        document.getElementById('zombieCounter').innerHTML = `🧟 ZOMBIES: ${zombies.length}`;
+    }
+
+    // SPAWN LARGE HORDE
+    function spawnHorde(count) {
+        for (let i = 0; i < count; i++) {
+            setTimeout(() => spawnZombie(), i * 30);
+        }
+    }
+
+    function updateUI() {
+        document.getElementById('healthFill').style.width = (player.hp / player.maxHp * 100) + '%';
+        document.getElementById('coinDisplay').innerText = Math.floor(coins);
+        document.getElementById('damageDisplay').innerText = currentDamage;
+        document.getElementById('waveDisplay').innerText = wave;
+        document.getElementById('killDisplay').innerText = kills;
+    }
+
+    function applyUpgrade(type) {
+        let up = upgrades[type];
+        let cost = up.cost;
+        if (coins >= cost) {
+            coins -= cost;
+            up.level++;
+            up.cost = Math.floor(up.cost * 1.5);
+            if (type === 'damage') {
+                currentDamage = up.base + (up.level - 1) * up.increment;
+                document.getElementById('damageLv').innerText = `Lv.${up.level}`;
+                document.getElementById('damagePrice').innerHTML = `💰 ${up.cost}`;
+            } else if (type === 'speed') {
+                player.speed = up.base + (up.level - 1) * up.increment;
+                document.getElementById('speedLv').innerText = `Lv.${up.level}`;
+                document.getElementById('speedPrice').innerHTML = `💰 ${up.cost}`;
+            } else if (type === 'health') {
+                player.maxHp = up.base + (up.level - 1) * up.increment;
+                player.hp = Math.min(player.hp + 40, player.maxHp);
+                document.getElementById('healthLv').innerText = `Lv.${up.level}`;
+                document.getElementById('healthPrice').innerHTML = `💰 ${up.cost}`;
+            }
+            updateUI();
+        }
+    }
+
+    function shoot() {
+        if (!gameRunning) return;
+        if (shootCooldown > 0) return;
+        shootCooldown = SHOOT_DELAY;
+        let angle = player.angle + (Math.random() - 0.5) * 0.1;
+        bullets.push({
+            x: player.x + Math.cos(angle) * 28,
+            y: player.y + Math.sin(angle) * 28,
+            vx: Math.cos(angle) * 850,
+            vy: Math.sin(angle) * 850,
+            life: 1.2
+        });
+        playSound('shoot');
+        
+        for (let i = 0; i < 5; i++) {
+            particles.push({
+                x: player.x + Math.cos(angle) * 25, y: player.y + Math.sin(angle) * 25,
+                vx: Math.cos(angle) * 80 + (Math.random() - 0.5) * 80,
+                vy: Math.sin(angle) * 80 + (Math.random() - 0.5) * 80,
+                life: 0.18, size: 2.5, color: '#ffcc66'
+            });
+        }
+    }
+
+    function update(delta) {
+        if (!gameRunning) return;
+        
+        // Movement
+        let moveX = 0, moveY = 0;
+        if (keys['w'] || keys['ArrowUp']) moveY -= 1;
+        if (keys['s'] || keys['ArrowDown']) moveY += 1;
+        if (keys['a'] || keys['ArrowLeft']) moveX -= 1;
+        if (keys['d'] || keys['ArrowRight']) moveX += 1;
+        if (joystick.active && (Math.abs(joystick.dx) > 0.1)) {
+            moveX = joystick.dx;
+            moveY = joystick.dy;
+        }
+        
+        if (moveX !== 0 || moveY !== 0) {
+            let len = Math.hypot(moveX, moveY);
+            moveX /= len; moveY /= len;
+            let newX = player.x + moveX * player.speed * delta;
+            let newY = player.y + moveY * player.speed * delta;
+            if (!checkCollision(newX, player.y, player.r)) player.x = newX;
+            if (!checkCollision(player.x, newY, player.r)) player.y = newY;
+            player.x = Math.min(WORLD_W - player.r, Math.max(player.r, player.x));
+            player.y = Math.min(WORLD_H - player.r, Math.max(player.r, player.y));
+            player.angle = Math.atan2(moveY, moveX);
+        }
+        
+        // Mouse aim
+        if (!isMobile && canvas) {
+            let rect = canvas.getBoundingClientRect();
+            let worldX = cam.x + (mouse.x / rect.width) * canvas.width;
+            let worldY = cam.y + (mouse.y / rect.height) * canvas.height;
+            player.angle = Math.atan2(worldY - player.y, worldX - player.x);
+            if (mouse.down && shootCooldown <= 0) shoot();
+        }
+        
+        if (shootCooldown > 0) shootCooldown -= delta;
+        if (player.invincibleTimer > 0) player.invincibleTimer -= delta;
+        
+        // AGGRESSIVE ZOMBIE SPAWNING - MORE ZOMBIES!
+        let maxZombies = Math.min(45 + Math.floor(wave / 1.2), 80);
+        if (zombies.length < maxZombies) {
+            // Much higher spawn rate
+            if (Math.random() < 0.65 * delta * 30) {
+                spawnZombie();
+            }
+        }
+        
+        // Faster wave progression
+        if (Math.random() < 0.015 * delta * 30) {
+            wave++;
+            document.getElementById('waveDisplay').innerText = wave;
+            // Spawn extra zombies on wave up
+            spawnHorde(5);
+            // Make warning flash
+            document.getElementById('warningMsg').style.opacity = '1';
+            setTimeout(() => document.getElementById('warningMsg').style.opacity = '0.5', 500);
+        }
+        
+        // UPDATE ZOMBIES
+        for (let i = 0; i < zombies.length; i++) {
+            let z = zombies[i];
+            let dx = player.x - z.x, dy = player.y - z.y;
+            let dist = Math.hypot(dx, dy);
+            
+            if (dist > 5 && dist < 500) {
+                let move = Math.min(z.speed * delta, dist - 6);
+                let angleZ = Math.atan2(dy, dx);
+                let newX = z.x + Math.cos(angleZ + Math.sin(z.wobble) * 0.08) * move;
+                let newY = z.y + Math.sin(angleZ + Math.cos(z.wobble) * 0.08) * move;
+                if (!checkCollision(newX, z.y, z.size - 2)) z.x = newX;
+                if (!checkCollision(z.x, newY, z.size - 2)) z.y = newY;
+                z.x = Math.min(WORLD_W - z.size, Math.max(z.size, z.x));
+                z.y = Math.min(WORLD_H - z.size, Math.max(z.size, z.y));
+            }
+            z.wobble += delta * 8;
+            if (z.flashTimer > 0) z.flashTimer -= delta * 6;
+            
+            // Damage player
+            if (player.invincibleTimer <= 0 && Math.hypot(player.x - z.x, player.y - z.y) < player.r + z.size - 3) {
+                player.hp -= z.damage;
+                player.invincibleTimer = 0.55;
+                playSound('hit');
+                updateUI();
+                document.getElementById('damageFlash').style.opacity = '1';
+                setTimeout(() => document.getElementById('damageFlash').style.opacity = '0', 150);
+                if (player.hp <= 0) gameOver();
+            }
+        }
+        
+        // UPDATE BULLETS
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            let b = bullets[i];
+            b.x += b.vx * delta;
+            b.y += b.vy * delta;
+            b.life -= delta;
+            let hit = false;
+            for (let j = 0; j < zombies.length; j++) {
+                let z = zombies[j];
+                if (Math.hypot(b.x - z.x, b.y - z.y) < z.size + 4) {
+                    z.hp -= currentDamage;
+                    z.flashTimer = 1;
+                    hit = true;
+                    if (z.hp <= 0) {
+                        coins += z.reward;
+                        kills++;
+                        playSound('kill');
+                        updateUI();
+                        for (let k = 0; k < 15; k++) {
+                            particles.push({
+                                x: z.x, y: z.y,
+                                vx: (Math.random() - 0.5) * 130, vy: (Math.random() - 0.5) * 130,
+                                life: 0.6, size: 2 + Math.random() * 5, color: `hsl(0,70%,${40 + Math.random() * 30}%)`
+                            });
+                        }
+                        zombies.splice(j, 1);
+                        document.getElementById('zombieCounter').innerHTML = `🧟 ZOMBIES: ${zombies.length}`;
+                        j--;
+                    }
+                    break;
+                }
+            }
+            if (hit || b.life <= 0 || b.x < -200 || b.x > WORLD_W + 200 || b.y < -200 || b.y > WORLD_H + 200) {
+                bullets.splice(i, 1);
+            }
+        }
+        
+        // UPDATE PARTICLES
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx * delta;
+            p.y += p.vy * delta;
+            p.life -= delta;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+        
+        // CAMERA
+        cam.x += (player.x - canvas.width/2 - cam.x) * 0.12;
+        cam.y += (player.y - canvas.height/2 - cam.y) * 0.12;
+        cam.x = Math.min(WORLD_W - canvas.width, Math.max(0, cam.x));
+        cam.y = Math.min(WORLD_H - canvas.height, Math.max(0, cam.y));
+        
+        updateUI();
+    }
+    
+    function render() {
+        if (!ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Ground - dark but visible
+        let grad = ctx.createLinearGradient(0, 0, WORLD_W, WORLD_H);
+        grad.addColorStop(0, '#3a3a2a');
+        grad.addColorStop(1, '#2a2a20');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+        
+        // Grid
+        ctx.strokeStyle = '#4a4a35';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i < WORLD_W; i += 100) {
+            ctx.beginPath();
+            ctx.moveTo(i - cam.x % 100, 0);
+            ctx.lineTo(i - cam.x % 100, WORLD_H);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0, i - cam.y % 100);
+            ctx.lineTo(WORLD_W, i - cam.y % 100);
+            ctx.stroke();
+        }
+        
+        // Obstacles
+        for (let obs of obstacles) {
+            let sx = obs.x - cam.x, sy = obs.y - cam.y;
+            if (obs.isCircle) {
+                ctx.fillStyle = '#5a5540';
+                ctx.beginPath(); ctx.arc(sx, sy, obs.radius, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#7a7550';
+                ctx.beginPath(); ctx.arc(sx - 3, sy - 3, obs.radius * 0.3, 0, Math.PI * 2); ctx.fill();
+            } else {
+                ctx.fillStyle = '#6a6545';
+                ctx.fillRect(sx - obs.w/2, sy - obs.h/2, obs.w, obs.h);
+                ctx.fillStyle = '#8a8555';
+                ctx.fillRect(sx - obs.w/2 + 4, sy - obs.h/2 + 3, obs.w - 8, 5);
+            }
+        }
+        
+        // ZOMBIES - VERY VISIBLE
+        for (let z of zombies) {
+            let sx = z.x - cam.x, sy = z.y - cam.y;
+            
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath(); ctx.ellipse(sx + 3, sy + 3, z.size - 2, z.size, 0, 0, Math.PI * 2); ctx.fill();
+            
+            // Body with flash effect
+            ctx.fillStyle = z.flashTimer > 0 ? '#ffaaaa' : z.color;
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, z.size - 2, z.size, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Outline for visibility
+            ctx.strokeStyle = '#ffcc88';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, z.size - 2, z.size, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Glowing eyes
+            ctx.fillStyle = z.eye;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = z.eye;
+            ctx.beginPath(); ctx.arc(sx - 5, sy - 4, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(sx + 5, sy - 4, 3, 0, Math.PI * 2); ctx.fill();
+            
+            // Mouth
+            ctx.fillStyle = '#3a1a1a';
+            ctx.beginPath(); ctx.ellipse(sx, sy + 4, 5, 4, 0, 0, Math.PI * 2); ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            
+            // Health bar
+            let hpPercent = z.hp / z.maxHp;
+            ctx.fillStyle = '#3a1a1a';
+            ctx.fillRect(sx - z.size, sy - z.size - 10, z.size * 2, 6);
+            ctx.fillStyle = hpPercent > 0.5 ? '#44ff44' : hpPercent > 0.25 ? '#ffaa44' : '#ff4444';
+            ctx.fillRect(sx - z.size, sy - z.size - 10, z.size * 2 * hpPercent, 6);
+        }
+        
+        // Bullets
+        for (let b of bullets) {
+            ctx.fillStyle = '#ffff88';
+            ctx.shadowBlur = 10;
+            ctx.beginPath(); ctx.arc(b.x - cam.x, b.y - cam.y, 4, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+        
+        // Particles
+        for (let p of particles) {
+            ctx.fillStyle = p.color || '#ffaa66';
+            ctx.beginPath(); ctx.arc(p.x - cam.x, p.y - cam.y, p.size || 3, 0, Math.PI * 2); ctx.fill();
+        }
+        
+        // Player
+        let px = player.x - cam.x, py = player.y - cam.y;
+        ctx.fillStyle = '#8a7a5a';
+        ctx.beginPath(); ctx.ellipse(px, py, player.r - 2, player.r, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#c0b090';
+        ctx.beginPath(); ctx.arc(px - 4, py - 4, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#4a4a3a';
+        ctx.beginPath(); ctx.rect(px - 7, py + 2, 14, 5); ctx.fill();
+        
+        // Weapon
+        let wx = px + Math.cos(player.angle) * 26;
+        let wy = py + Math.sin(player.angle) * 26;
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(wx, wy);
+        ctx.lineWidth = 6; ctx.strokeStyle = '#7a6a4a'; ctx.stroke();
+        
+        // Lighting
+        lctx.clearRect(0, 0, canvas.width, canvas.height);
+        lctx.fillStyle = 'rgba(0,0,0,0.55)';
+        lctx.fillRect(0, 0, canvas.width, canvas.height);
+        lctx.globalCompositeOperation = 'destination-out';
+        let gradient = lctx.createRadialGradient(px, py, 10, px, py, 250);
+        gradient.addColorStop(0, 'rgba(0,0,0,1)');
+        gradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        lctx.fillStyle = gradient;
+        lctx.beginPath(); lctx.arc(px, py, 260, 0, Math.PI * 2); lctx.fill();
+        lctx.globalCompositeOperation = 'source-over';
+    }
+    
+    function gameLoop(now) {
+        if (!gameRunning) return;
+        let delta = Math.min(0.033, (now - lastTime) / 1000);
+        if (delta > 0 && delta < 0.1) {
+            update(delta);
+            render();
+        }
+        lastTime = now;
+        requestAnimationFrame(gameLoop);
+    }
+    
+    function gameOver() {
+        gameRunning = false;
+        document.getElementById('gameOverStats').innerHTML = `
+            ⏱️ SURVIVAL: ${Math.floor(kills / 1.2)}s<br>
+            💀 ZOMBIES KILLED: ${kills}<br>
+            🌊 WAVES SURVIVED: ${wave}<br>
+            🪙 COINS EARNED: ${Math.floor(coins)}<br>
+            🧟 TOTAL SPAWNED: ${totalSpawned}
+        `;
+        document.getElementById('gameOverScreen').classList.remove('hide');
+    }
+    
+    function startGame() {
+        gameRunning = true;
+        kills = 0;
+        coins = 150;
+        wave = 1;
+        totalSpawned = 0;
+        zombies = [];
+        bullets = [];
+        particles = [];
+        
+        player = {
+            x: WORLD_W/2, y: WORLD_H/2, r: 15, hp: 100, maxHp: 100,
+            speed: 200, angle: 0, invincibleTimer: 0
+        };
+        
+        upgrades = {
+            damage: { level: 1, base: 40, increment: 15, cost: 100 },
+            speed: { level: 1, base: 200, increment: 20, cost: 80 },
+            health: { level: 1, base: 100, increment: 25, cost: 120 }
+        };
+        currentDamage = 40;
+        
+        document.getElementById('damageLv').innerText = 'Lv.1';
+        document.getElementById('damagePrice').innerHTML = '💰 100';
+        document.getElementById('speedLv').innerText = 'Lv.1';
+        document.getElementById('speedPrice').innerHTML = '💰 80';
+        document.getElementById('healthLv').innerText = 'Lv.1';
+        document.getElementById('healthPrice').innerHTML = '💰 120';
+        
+        generateWorld();
+        
+        // SPAWN 40 ZOMBIES IMMEDIATELY - HARDCORE!
+        console.log("Spawning 40 zombies - HELL MODE ACTIVE!");
+        spawnHorde(40);
+        
+        initAudio();
+        
+        updateUI();
+        document.getElementById('zombieCounter').innerHTML = `🧟 ZOMBIES: ${zombies.length}`;
+        document.getElementById('startScreen').classList.add('hide');
+        document.getElementById('gameOverScreen').classList.add('hide');
+        
+        lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    }
+    
+    function resize() {
+        canvas.width = lightCanvas.width = window.innerWidth;
+        canvas.height = lightCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    
+    window.addEventListener('keydown', (e) => { 
+        keys[e.key] = true; 
+        if (e.key === ' ' || e.key === 'Space') { e.preventDefault(); if (gameRunning) shoot(); }
+    });
+    window.addEventListener('keyup', (e) => { keys[e.key] = false; });
+    
+    canvas.addEventListener('mousemove', (e) => { 
+        let rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+    });
+    canvas.addEventListener('mousedown', (e) => { mouse.down = true; if (gameRunning) shoot(); });
+    canvas.addEventListener('mouseup', () => { mouse.down = false; });
+    canvas.addEventListener('click', () => { if (!audioCtx && gameRunning) initAudio(); });
+    
+    // Joystick
+    let jZone = document.getElementById('joystickZone');
+    let jKnob = document.getElementById('joystickKnob');
+    if (jZone) {
+        jZone.addEventListener('touchstart', (e) => { e.preventDefault(); joystick.active = true; });
+        jZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            let rect = jZone.getBoundingClientRect();
+            let touch = e.touches[0];
+            let dx = touch.clientX - rect.left - 60;
+            let dy = touch.clientY - rect.top - 60;
+            let len = Math.hypot(dx, dy);
+            let maxR = 50;
+            if (len > maxR) { dx = dx / len * maxR; dy = dy / len * maxR; len = maxR; }
+            joystick.dx = len > 10 ? dx / maxR : 0;
+            joystick.dy = len > 10 ? dy / maxR : 0;
+            jKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        });
+        jZone.addEventListener('touchend', () => {
+            joystick.active = false;
+            joystick.dx = 0; joystick.dy = 0;
+            jKnob.style.transform = 'translate(-50%, -50%)';
+        });
+    }
+    
+    document.getElementById('shootBtn')?.addEventListener('touchstart', (e) => { e.preventDefault(); if (gameRunning) shoot(); });
+    document.getElementById('shopToggleBtn')?.addEventListener('touchstart', (e) => { e.preventDefault(); document.getElementById('shopPanel').classList.toggle('hide'); });
+    document.getElementById('upgradeDamage')?.addEventListener('click', () => applyUpgrade('damage'));
+    document.getElementById('upgradeSpeed')?.addEventListener('click', () => applyUpgrade('speed'));
+    document.getElementById('upgradeHealth')?.addEventListener('click', () => applyUpgrade('health'));
+    document.getElementById('startBtn')?.addEventListener('click', startGame);
+    document.getElementById('restartBtn')?.addEventListener('click', startGame);
+    
+    if (isMobile) document.getElementById('mobileControls').style.display = 'block';
+    
+    generateWorld();
+    console.log("HELL MODE READY! 40 zombies will spawn when you click START!");
+</script>
+</body>
+</html>
